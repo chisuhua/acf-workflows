@@ -1,0 +1,152 @@
+# ACF 工作流触发器配置
+
+**版本**: v1.0  
+**创建时间**: 2026-03-29  
+**用途**: 定义 ACF Skills 自动触发规则
+
+---
+
+## 触发器列表
+
+### 1. 每日状态报告
+
+```yaml
+trigger:
+  name: daily-status
+  condition:
+    type: cron
+    expression: "0 9 * * *"  # 每日 9:00
+  action:
+    type: skill
+    name: acf-status
+    params:
+      mode: brief
+  enabled: true
+```
+
+---
+
+### 2. Task 评审通过后自动流转
+
+```yaml
+trigger:
+  name: task-completed
+  condition:
+    type: command
+    pattern: "/zcf:task-review.*评审通过"
+    source: task-review
+  action:
+    type: skill
+    name: acf-flow
+    params:
+      action: next
+  enabled: true
+```
+
+---
+
+### 3. P0 问题发现时自动创建修复任务
+
+```yaml
+trigger:
+  name: p0-issue-found
+  condition:
+    type: command
+    pattern: "/zcf:task-review.*(❌ 严重|P0|阻塞)"
+    source: task-review
+  action:
+    type: skill
+    name: acf-fix
+    params:
+      action: create
+      priority: auto
+  enabled: true
+```
+
+---
+
+### 4. 阶段完成后生成完整报告
+
+```yaml
+trigger:
+  name: phase-completed
+  condition:
+    type: command
+    pattern: "/zcf:task-review.*阶段.*完成"
+    source: task-review
+  action:
+    type: skill
+    name: acf-status
+    params:
+      mode: full
+  enabled: true
+```
+
+---
+
+### 5. 架构评审通过后自动同步
+
+```yaml
+trigger:
+  name: arch-review-passed
+  condition:
+    type: command
+    pattern: "/zcf:task-review.*架构.*评审通过"
+    source: task-review
+  action:
+    type: skill
+    name: acf-sync
+  enabled: true
+```
+
+---
+
+## 使用说明
+
+### 手动触发
+
+```bash
+# 查看状态
+skill_use acf-status mode=brief
+
+# 获取下一个任务
+skill_use acf-flow action=next
+
+# 创建修复任务
+skill_use acf-fix action=create summary="问题描述" priority=P0
+
+# 同步架构文档
+skill_use acf-sync --dry-run
+```
+
+### 自动触发
+
+上述触发器会在条件满足时自动执行对应的 Skill。
+
+---
+
+## 触发器日志
+
+**日志位置**: `~/.openclaw/logs/acf-triggers.log`
+
+**日志格式**:
+```
+[时间戳] [触发器名称] 条件匹配 → 执行动作 → 结果
+```
+
+---
+
+## 禁用/启用触发器
+
+```bash
+# 禁用触发器
+# 编辑此文件，将 enabled: true 改为 enabled: false
+
+# 启用触发器
+# 编辑此文件，将 enabled: false 改为 enabled: true
+```
+
+---
+
+**维护人**: DevMate  
+**下次评审**: 2026-04-05

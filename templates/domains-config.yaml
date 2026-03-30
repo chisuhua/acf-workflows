@@ -1,0 +1,33 @@
+# 领域配置模板
+
+**用途**: 配置项目支持的领域和数据源
+
+domains:
+  - id: domain-1                # 领域 1
+    name: "领域 1 名称"
+    enabled: true
+    sources:
+      - source-1
+      - source-2
+    keywords:
+      - "关键词 1"
+      - "关键词 2"
+    
+  - id: domain-2                # 领域 2（未来扩展）
+    name: "领域 2 名称"
+    enabled: false
+    sources:
+      - source-1
+    keywords:
+      - "关键词 3"
+
+sources:
+  source-1:
+    name: "数据源 1"
+    type: "api"
+    rate_limit: 100
+    
+  source-2:
+    name: "数据源 2"
+    type: "web"
+    rate_limit: 60
