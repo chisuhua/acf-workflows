@@ -25,6 +25,50 @@
 | `INTERVIEW` | 需求澄清中 | 继续 Interview |
 
 **实现文件**:
+- `templates/current-task-template.md` — 添加状态机模板字段
+- `skills/acf-executor/scripts/execute-task.sh` — 执行前更新状态
+- `skills/acf-flow/scripts/auto-flow.sh` — 流转时更新状态
+- `docs/acf-workflow.md` — 更新 Gateway Restart 恢复流程
+- `skills/acf-executor/SKILL.md` — 添加状态机更新说明
+- `docs/CHANGELOG-v3.1.md` — 记录 P0 实现
+
+**收益**: 恢复时间从 30 秒 → **3 秒**
+
+---
+
+### 0.5 替代方案实施（P1 调整）⭐
+
+**原 P1 项**:
+- `task-handoff.md` → **调整为增强 task-review 输出**
+- `start-multi-agent.sh` → **放弃**（acf-executor 已支持并行）
+
+**实施内容**:
+- 更新 `~/.agents/commands/zcf/task-review.md` — 引入编码助手角色、Git 分支策略、合规检查
+- 更新 `~/.agents/commands/zcf/templates/task-review-template.md` — 标准化给 DevMate 的评审报告格式
+- 新增"给 DevMate 的行动建议"章节
+- 明确偏差级别定义（轻微/中等/严重）
+
+**收益**: 评审报告标准化，编码助手清晰知道如何向 DevMate 反馈
+
+---
+
+### 1. ACP 驱动 OpenCode 实现 ✅
+
+**问题**: Gateway Restart 恢复依赖遍历文件，效率低（30 秒）
+
+**解决方案**: 在 `.acf/status/current-task.md` 中添加状态机字段
+
+**状态枚举**（6 个）:
+| 状态 | 含义 | 恢复动作 |
+|------|------|---------|
+| `IDLE` | 无任务 | 汇报"无待办" |
+| `EXECUTING` | 任务执行中 | 检查 OpenCode session |
+| `WAITING_REVIEW` | 等待评审 | 提醒运行 `/zcf/task-review` |
+| `BLOCKED` | 阻塞 | 汇报阻塞原因 |
+| `DONE` | 任务完成 | 执行 `acf-flow --next` |
+| `INTERVIEW` | 需求澄清中 | 继续 Interview |
+
+**实现文件**:
 - `templates/current-task-template.md` — 添加状态机模板
 - `skills/acf-executor/scripts/execute-task.sh` — 执行前更新状态
 - `skills/acf-flow/scripts/auto-flow.sh` — 流转时更新状态
