@@ -61,7 +61,6 @@ update_state() {
     local status_file="$CWD/.acf/status/current-task.md"
     
     if [ -f "$status_file" ]; then
-        # 更新现有文件
         sed -i "s/\*\*当前状态\*\*: .*/\*\*当前状态\*\*: \`$state\`/" "$status_file"
         sed -i "s/\*\*最后状态转换\*\*: .*/\*\*最后状态转换\*\*: \`$prev_state\` → \`$state\` ($(date +'%Y-%m-%d %H:%M:%S'))/" "$status_file"
         sed -i "s/\*\*下一步动作\*\*: .*/\*\*下一步动作\*\*: \`$next_action\`/" "$status_file"
@@ -74,14 +73,45 @@ update_state() {
     fi
 }
 
+# 构建任务 Prompt（含编码助手角色定义）
+build_task_prompt() {
+    local task="$1"
+    local cwd="$2"
+    local prompt_file="$cwd/temp/current-task-prompt.md"
+    local template_file="/workspace/acf-workflow/templates/task-prompt.md"
+    
+    # 创建临时目录
+    mkdir -p "$cwd/temp"
+    
+    # 加载模板并填充变量
+    if [ -f "$template_file" ]; then
+        cat "$template_file" | \
+            sed "s/{{Task ID}}/$(echo "$task" | grep -oE 'Task [0-9]+' | head -1)/g" | \
+            sed "s/{{任务名称}}/$task/g" | \
+            sed "s/{{PROJECT_PATH}}/$cwd/g" | \
+            sed "s/{{主文档名}}/YYY-MM-DD-architecture/g" | \
+            sed "s/{{task-id}}/$(echo "$task" | grep -oE 'Task [0-9]+' | head -1 | tr '[:upper:]' '[:lower:]' | tr ' ' '-')/g" | \
+            sed "s/{{short-desc}}/task/g" > "$prompt_file"
+        
+        echo "✅ 任务 Prompt 已生成：$prompt_file"
+        cat "$prompt_file"
+    else
+        echo "⚠️  警告：模板文件不存在，使用原始任务描述"
+        echo "$task"
+    fi
+}
+
 # 执行前更新状态：IDLE → EXECUTING
 update_state "EXECUTING" "IDLE" "/zcf/task-review \"$TASK 完成\""
 
-# 使用 OpenClaw sessions spawn 启动 ACP 驱动的 OpenCode
+# 构建任务 Prompt（含编码助手角色定义）
+TASK_PROMPT=$(build_task_prompt "$TASK" "$CWD")
+
+# 使用 OpenClaw sessions spawn 启动 ACP 驱动的 OpenCode（编码助手角色）
 openclaw sessions spawn \
   --runtime acp \
   --agent-id opencode \
-  --task "$TASK" \
+  --task "$TASK_PROMPT" \
   --cwd "$CWD" \
   --mode "$MODE" \
   --label "$LABEL"

@@ -9,9 +9,10 @@
 ## 功能
 
 - 通过 `sessions_spawn` 工具启动 ACP 驱动的 OpenCode
-- 传递任务 Prompt 给 OpenCode
+- 传递任务 Prompt 给 OpenCode（含**编码助手角色定义**）
 - 支持并行执行多个任务
 - 支持任务标签和状态追踪
+- 自动加载 `templates/task-prompt.md` 模板
 
 ---
 
