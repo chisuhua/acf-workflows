@@ -1,12 +1,16 @@
 #!/bin/bash
-# generate-status.sh — ZCF 项目状态生成脚本
+# generate-status.sh — ACF 项目状态生成脚本
 # 用法：./generate-status.sh [project_path] [mode]
-# 示例：./generate-status.sh /workspace/ecommerce full
+# 
+# 环境变量:
+#   PROJECT_PATH - 项目根目录 (默认：/workspace/ecommerce)
+#   MODE         - 报告模式：full/brief/next (默认：full)
 
 set -e
 
-PROJECT_PATH="${1:-/workspace/ecommerce}"
-MODE="${2:-full}"
+# 支持环境变量配置（多项目支持）
+PROJECT_PATH="${PROJECT_PATH:-/workspace/ecommerce}"
+MODE="${MODE:-${1:-full}}"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -44,8 +48,8 @@ check_doc_status() {
 }
 
 check_coding_status() {
-    local src_count=$(find "$PROJECT_PATH/src" -name "*.py" 2>/dev/null | wc -l)
-    local test_count=$(find "$PROJECT_PATH/tests" -name "*.py" 2>/dev/null | wc -l)
+    local src_count=$(find "$PROJECT_PATH/src" -name "*.py" -o -name "*.cpp" -o -name "*.js" -o -name "*.ts" 2>/dev/null | wc -l)
+    local test_count=$(find "$PROJECT_PATH/tests" -name "*.py" -o -name "*.cpp" -o -name "*.js" -o -name "*.ts" 2>/dev/null | wc -l)
     
     if [ $src_count -eq 0 ] && [ $test_count -eq 0 ]; then
         echo "⏸️ 未开始"
@@ -101,79 +105,40 @@ generate_full_report() {
 
 ## 📄 架构文档状态
 
-### 核心文档
-EOF
+### 已完成 ✅
+\`\`\`bash
+find "$PROJECT_PATH/docs/architecture" -name "*.md" -type f 2>/dev/null | head -10
+\`\`\`
 
-    find "$PROJECT_PATH/docs/architecture" -maxdepth 1 -name "*.md" -type f 2>/dev/null | while read file; do
-        local size=$(ls -lh "$file" | awk '{print $5}')
-        echo "- ✅ $(basename "$file") ($size)"
-    done
-
-    cat << EOF
-
-### ADR 文档
-EOF
-
-    find "$PROJECT_PATH/docs/architecture/decisions" -name "*.md" -type f 2>/dev/null | wc -l | xargs -I {} echo "- {} 个 ADR 文档"
-
-    cat << EOF
+### 待创建 ❌
+- [ ] 总体架构文档（如缺失）
+- [ ] 项目测试策略（如缺失）
+- [ ] 实施计划（如缺失）
 
 ---
 
 ## 💻 编码进度
 
-### 源代码
-- 文件数：$(find "$PROJECT_PATH/src" -name "*.py" 2>/dev/null | wc -l)
-- 目录数：$(find "$PROJECT_PATH/src" -type d 2>/dev/null | wc -l)
-
-### 测试代码
-- 文件数：$(find "$PROJECT_PATH/tests" -name "*.py" 2>/dev/null | wc -l)
-
-### Git 提交
-EOF
-
-    if [ -d "$PROJECT_PATH/.git" ]; then
-        git -C "$PROJECT_PATH" log --oneline -5 2>/dev/null | sed 's/^/```/' | sed '$s/$$/```/'
-    else
-        echo "（非 Git 仓库）"
-    fi
-
-    cat << EOF
-
----
-
-## ⚠️ 架构问题追踪
-
-EOF
-
-    if [ -f "$PROJECT_PATH/temp/arch-issues.md" ]; then
-        echo "（查看 \`$PROJECT_PATH/temp/arch-issues.md\`）"
-    else
-        echo "**无架构问题记录**"
-    fi
-
-    cat << EOF
+**源代码文件**: $(find "$PROJECT_PATH/src" -name "*.py" -o -name "*.cpp" -o -name "*.js" -o -name "*.ts" 2>/dev/null | wc -l) 个
+**测试文件**: $(find "$PROJECT_PATH/tests" -name "*.py" -o -name "*.cpp" -o -name "*.js" -o -name "*.ts" 2>/dev/null | wc -l) 个
 
 ---
 
 ## 🎯 下一步建议
 
-### 推荐路径
-
+### 立即执行
 \`\`\`bash
-# 1. 查看下一步
-skill_use acf-status mode=next
-
-# 2. 执行下一个任务
-skill_use acf-flow --next-task
-
-# 3. 任务完成后评审
-/zcf:task-review "Task XXX 完成"
+skill_use acf-flow --next
 \`\`\`
+
+### 后续步骤
+1. 执行下一个任务
+2. 完成后运行：\`/zcf[:/]task-review "Task XXX 完成"\`
 
 ---
 
-**下次检查**: 建议每日 9:00 自动检查（配置 cron 触发器）
+**生成脚本**: \`$PROJECT_PATH/acf-workflow/skills/acf-status/scripts/generate-status.sh\`
+**使用环境变量**: PROJECT_PATH=$PROJECT_PATH, MODE=$MODE
 EOF
 }
 
@@ -181,8 +146,8 @@ generate_brief_report() {
     cat << EOF
 ## 📊 项目状态简报
 
-**生成时间**: $(date +'%Y-%m-%d %H:%M')
-
+**生成时间**: $(date +'%Y-%m-%d %H:%M:%S')
+**项目**: $PROJECT_PATH
 **总体进度**: 估算中...
 
 | 维度 | 状态 |
@@ -192,7 +157,11 @@ generate_brief_report() {
 | 编码进度 | $(check_coding_status) |
 | 架构问题 | $(check_issue_status) |
 
-**下一步**: \`skill_use acf-flow --next-task\`
+**下一步**: \`skill_use acf-flow --next\`
+
+---
+
+**提示**: 完整报告请使用 \`skill_use acf-status mode=full\`
 EOF
 }
 
@@ -201,27 +170,27 @@ generate_next_report() {
 ## 🎯 下一步建议
 
 ### 立即执行（5 分钟内可开始）
-
 \`\`\`bash
-skill_use acf-flow --next-task
+skill_use acf-flow --next
 \`\`\`
 
 ### 后续步骤
-
-1. 执行 Task XXX（查看 \`temp/phase*-tasks.md\`）
-2. 完成后 \`/zcf:task-review "Task XXX 完成"\`
-3. 根据评审结果继续或修复
+1. 执行任务
+2. 完成后：\`/zcf[:/]task-review "Task XXX 完成"\`
+3. 获取下一个任务：\`skill_use acf-flow --next\`
 
 ---
 
-**提示**: 使用 \`skill_use acf-status mode=brief\` 查看完整状态
+**提示**: 完整报告请使用 \`skill_use acf-status mode=full\`
 EOF
 }
 
 # ==================== 主程序 ====================
 
-echo "正在分析项目状态..." >&2
-echo "" >&2
+echo "正在生成状态报告..."
+echo "项目路径：$PROJECT_PATH"
+echo "报告模式：$MODE"
+echo ""
 
 case $MODE in
     full)
@@ -234,8 +203,8 @@ case $MODE in
         generate_next_report
         ;;
     *)
-        echo "未知模式：$MODE" >&2
-        echo "用法：$0 [project_path] [full|brief|next]" >&2
+        echo "❌ 未知模式：$MODE"
+        echo "可用模式：full, brief, next"
         exit 1
         ;;
 esac

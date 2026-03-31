@@ -33,7 +33,8 @@ trigger:
   name: task-completed
   condition:
     type: command
-    pattern: "/zcf:task-review.*评审通过"
+    # 支持 OpenCode (/zcf/task-review) 和 Claude Code (/zcf:task-review) 两种格式
+    pattern: "/zcf[:/]task-review.*评审通过"
     source: task-review
   action:
     type: skill
@@ -52,7 +53,8 @@ trigger:
   name: p0-issue-found
   condition:
     type: command
-    pattern: "/zcf:task-review.*(❌ 严重|P0|阻塞)"
+    # 支持 OpenCode (/zcf/task-review) 和 Claude Code (/zcf:task-review) 两种格式
+    pattern: "/zcf[:/]task-review.*(❌ 严重|P0|阻塞)"
     source: task-review
   action:
     type: skill
@@ -72,7 +74,8 @@ trigger:
   name: phase-completed
   condition:
     type: command
-    pattern: "/zcf:task-review.*阶段.*完成"
+    # 支持 OpenCode (/zcf/task-review) 和 Claude Code (/zcf:task-review) 两种格式
+    pattern: "/zcf[:/]task-review.*阶段.*完成"
     source: task-review
   action:
     type: skill
@@ -91,7 +94,8 @@ trigger:
   name: arch-review-passed
   condition:
     type: command
-    pattern: "/zcf:task-review.*架构.*评审通过"
+    # 支持 OpenCode (/zcf/task-review) 和 Claude Code (/zcf:task-review) 两种格式
+    pattern: "/zcf[:/]task-review.*架构.*评审通过"
     source: task-review
   action:
     type: skill
