@@ -1,6 +1,6 @@
 # ACF 工作流快速启动指南
 
-**版本**: v1.0  
+**版本**: v2.0（ACP 驱动版）  
 **创建时间**: 2026-03-30  
 **用途**: 新项目快速启动 ACF 工作流
 
@@ -46,11 +46,15 @@ cat > /workspace/$PROJECT_NAME/AGENTS.md << 'EOF'
 ### 查看项目状态
 skill_use acf-status mode=brief
 
+### 执行任务（ACP 驱动 OpenCode）
+skill_use acf-executor task="Task 001: xxx" cwd="/workspace/$PROJECT_NAME"
+
 ### 获取下一个任务
 skill_use acf-flow action=next
 
 ### 任务评审
-/zcf:task-review "Task XXX 完成"
+/zcf:task-review "Task XXX 完成"      # OpenCode
+/zcf:task-review "Task XXX 完成"      # Claude Code
 EOF
 ```
 
@@ -77,7 +81,7 @@ EOF
 
 **流程**:
 1. 创建阶段 1 任务计划
-2. 执行 Task 001, Task 002, ...
+2. 执行 Task 001, Task 002, ...（通过 ACP 驱动 OpenCode）
 3. 阶段完成后执行阶段审查
 
 **阶段审查**:
@@ -137,7 +141,7 @@ EOF
 │   └── config/                     # 配置（触发器）
 ├── src/                            # 源代码
 ├── tests/                          # 测试代码
-└── docs/architecture/              # 架构文档（只读，从 mynotes 同步）
+└── docs/architecture/              # 架构文档（从 mynotes 同步）
 
 /workspace/mynotes/$PROJECT_NAME/
 └── docs/architecture/              # 架构讨论（提案仓库）
@@ -174,17 +178,65 @@ EOF
 # 查看项目状态
 skill_use acf-status mode=brief
 
+# 执行任务（ACP 驱动 OpenCode）
+skill_use acf-executor task="Task 001: 创建 Crawler 基类" cwd="/workspace/ecommerce"
+
 # 获取下一个任务
 skill_use acf-flow action=next
 
 # 任务评审
-/zcf:task-review "Task XXX 完成"
+/zcf:task-review "Task XXX 完成"      # OpenCode
+/zcf:task-review "Task XXX 完成"      # Claude Code
 
 # 同步架构文档
 skill_use acf-sync
 
 # 创建修复任务
 skill_use acf-fix action=create summary="问题描述"
+```
+
+---
+
+## ✅ ACP 配置检查
+
+在开始执行任务前，确保 ACP 已正确配置：
+
+```bash
+# 检查 ACP 状态
+/acp doctor
+
+# 检查配置
+openclaw config show acp.enabled
+openclaw config show plugins.entries.acpx.enabled
+
+# 检查 OpenCode 是否安装
+opencode --version
+```
+
+**必需配置**:
+- `acp.enabled=true`
+- `plugins.entries.acpx.enabled=true`
+- `acp.defaultAgent=opencode`
+- `acp.allowedAgents=["opencode"]`
+
+---
+
+## 🎯 ACP 驱动任务执行示例
+
+```bash
+# 执行单个任务
+skill_use acf-executor task="Task 001: 创建 Crawler 基类" cwd="/workspace/ecommerce"
+
+# 并行执行多个任务
+skill_use acf-executor task="Task 002: 实现重试机制" cwd="/workspace/ecommerce"
+skill_use acf-executor task="Task 003: 实现熔断器" cwd="/workspace/ecommerce"
+skill_use acf-executor task="Task 005: 数据存储工具" cwd="/workspace/ecommerce"
+
+# 查看执行状态
+openclaw sessions list
+
+# 停止任务
+/acp cancel agent:opencode:acp:xxx
 ```
 
 ---
