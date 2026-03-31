@@ -1,9 +1,9 @@
-# ACF 双循环工作流 v3.0（权威版）
+# ACF 双循环工作流 v3.1（ACP 驱动版）
 
 **创建时间**: 2026-03-29  
-**版本**: v3.0（角色与命令澄清版）  
+**版本**: v3.1（ACP 驱动 OpenCode 实现）  
 **状态**: 生效中  
-**归档**: v1.0 → `archive/acf-workflow-v1.md`, v2.0 → `archive/acf-workflow-v2.md`
+**归档**: v1.0 → `archive/acf-workflow-v1.md`, v2.0 → `archive/acf-workflow-v2.md`, v3.0 → `archive/acf-workflow-v3.0.md`
 
 ---
 
@@ -38,9 +38,10 @@
 │  频率：每日执行 | 产出：可运行代码、测试、Git 提交                 │
 │                                                                 │
 │  1. DevMate → 编码架构师发送任务                                │
-│     task(prompt="Task 001: 创建 Crawler 基类")                  │
+│     skill_use acf-executor task="Task 001: ..."                │
+│     或 sessions_spawn(runtime="acp", agentId="opencode")        │
 │                                                                 │
-│  2. 编码架构师实现代码                                          │
+│  2. 编码架构师实现代码（通过 ACP 驱动）                          │
 │     → 输出：/workspace/<Project>/src/...                        │
 │                                                                 │
 │  3. DevMate → 编码架构师发送评审命令                            │
@@ -54,6 +55,8 @@
 │     └─ 发现问题 → 返回架构循环，和老板沟通                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+**关键实现**: 编码循环使用 **ACP 驱动 OpenCode**（`sessions_spawn(runtime="acp", agentId="opencode")`）
 
 ---
 
@@ -75,7 +78,7 @@
 
 | 角色 | 身份 | 使用的命令/技能 | 命令格式 |
 |------|------|----------------|---------|
-| **DevMate** | 你（技术合伙人） | `acf-flow`, `acf-status`, `acf-fix`, `acf-sync` | OpenClaw Skills |
+| **DevMate** | 你（技术合伙人） | `acf-flow`, `acf-status`, `acf-fix`, `acf-sync`, **`acf-executor`** | OpenClaw Skills |
 | **OpenCode** | 编码架构师 | `/zcf/arch-doc`, `/zcf/task-review`, `/zcf/status` | **斜杠** `/zcf/` |
 | **Claude Code** | 编码架构师 | `/zcf:arch-doc`, `/zcf:task-review`, `/zcf:status` | **冒号** `/zcf:` |
 
@@ -83,7 +86,7 @@
 - OpenCode: 使用 `/command/arg` 格式（斜杠）
 - Claude Code: 使用 `/command:arg` 格式（冒号）
 
-**重要**: `/zcf/` 技能是**编码架构师使用的**，不是 DevMate 直接使用的。DevMate 使用 `acf-*` Skills 来驱动工作流程。
+**重要**: `/zcf/` 技能是**编码架构师使用的**，不是 DevMate 直接使用的。DevMate 使用 `acf-*` Skills 来驱动工作流程，其中 `acf-executor` 通过 ACP 驱动 OpenCode 执行任务。
 
 ---
 
@@ -93,20 +96,20 @@
 
 | 角色 | 职责 | 工作目录 | 使用的命令/技能 | 输出路径 |
 |------|------|---------|----------------|---------|
-| **DevMate** | 架构讨论、流程驱动、问题发现 | 双仓库 | `acf-flow`, `acf-status`, `acf-fix`, `acf-sync` | 提案仓库 + 编码仓库 |
+| **DevMate** | 架构讨论、流程驱动、问题发现 | 双仓库 | `acf-flow`, `acf-status`, `acf-fix`, `acf-sync`, `acf-executor` | 提案仓库 + 编码仓库 |
 | **编码架构师** (OpenCode/Claude Code) | 标准化架构文档生成、任务执行、自评 | 编码仓库 | `/zcf/arch-doc`, `/zcf/task-review`, `/zcf/status` | 仅编码仓库 |
 | **老板** | 架构决策确认、技术选型审批 | 提案仓库（只读） | 无（人工评审） | - |
 
+---
+
 ### 2.2 编码架构师的 /zcf/ 技能列表
 
-| 技能 | 用途 | OpenCode 格式 | Claude Code 格式 |
-|------|------|--------------|-----------------|
-| `arch-doc` | 架构文档生成（3 阶段：研究→构思→评审） | `/zcf/arch-doc "主题"` | `/zcf:arch-doc "主题"` |
-| `task-review` | 任务评审（架构一致性检查、偏差识别） | `/zcf/task-review "Task XXX"` | `/zcf:task-review "Task XXX"` |
-| `status` | 状态分析（完整/简要/仅下一步） | `/zcf/status [mode]` | `/zcf:status [mode]` |
-| `github-sync` | GitHub 同步（Milestones + Issues） | `/zcf/github-sync "Phase 1"` | `/zcf:github-sync "Phase 1"` |
-
-**技能定义位置**: `~/.agents/commands/zcf/*.md`
+| 技能 | 用途 | OpenCode 格式 | Claude Code 格式 | 定义位置 |
+|------|------|--------------|-----------------|---------|
+| `arch-doc` | 架构文档生成（3 阶段：研究→构思→评审） | `/zcf/arch-doc "主题"` | `/zcf:arch-doc "主题"` | `~/.agents/commands/zcf/arch-doc.md` |
+| `task-review` | 任务评审（架构一致性检查、偏差识别） | `/zcf/task-review "Task XXX"` | `/zcf:task-review "Task XXX"` | `~/.agents/commands/zcf/task-review.md` |
+| `status` | 状态分析（完整/简要/仅下一步） | `/zcf/status [mode]` | `/zcf:status [mode]` | `~/.agents/commands/zcf/status.md` |
+| `github-sync` | GitHub 同步（Milestones + Issues） | `/zcf/github-sync "Phase 1"` | `/zcf:github-sync "Phase 1"` | `~/.agents/commands/zcf/github-sync.md` |
 
 ---
 
@@ -118,6 +121,7 @@
 | `acf-flow` | 任务自动流转（读取计划 → 下一个任务） | `skill_use acf-flow [--next]` | Task 评审通过后 |
 | `acf-fix` | 修复任务创建（P0/P1 问题） | `skill_use acf-fix action=create` | 评审发现问题时 |
 | `acf-sync` | 同步提案仓库 → 编码仓库 | `skill_use acf-sync [--dry-run]` | 架构定稿后 |
+| **`acf-executor`** | **任务执行（ACP 驱动 OpenCode）** | `skill_use acf-executor task="..."` | **任务执行时** |
 
 **Skill 定义位置**: `/workspace/acf-workflow/skills/*/SKILL.md`
 
@@ -165,15 +169,25 @@ skill_use acf-sync
 
 ---
 
-### 3.2 编码循环流程（双方协作）
+### 3.2 编码循环流程（双方协作）— ACP 驱动版
 
 ```bash
 # 1. 架构文档已定稿（编码仓库）
 
-# 2. DevMate → 编码架构师发送任务
-task(prompt="Task 001: 创建 Crawler 基类")
+# 2. DevMate → 编码架构师发送任务（ACP 驱动）
+skill_use acf-executor task="Task 001: 创建 Crawler 基类" cwd="/workspace/ecommerce"
 
-# 3. 编码架构师实现代码
+# 或
+sessions_spawn(
+    runtime="acp",
+    agentId="opencode",
+    task="Task 001: 创建 Crawler 基类",
+    cwd="/workspace/ecommerce",
+    mode="run",
+    label="Task-001"
+)
+
+# 3. 编码架构师实现代码（通过 ACP 协议）
 #    输出：/workspace/<Project>/src/crawler/base.py
 
 # 4. DevMate → 编码架构师发送评审命令
@@ -299,6 +313,157 @@ skill_use acf-sync list=true
 
 ---
 
+### 3.4 任务接收决策树（强制流程）
+
+**版本**: v1.0  
+**生效日期**: 2026-03-31  
+**强制级别**: 🔴 必须遵循
+
+---
+
+#### 3.4.1 决策树流程图
+
+```
+收到任务
+    │
+    ▼
+┌─────────────────────────────────────┐
+│ 步骤 1: 需求澄清检查                 │
+│ 问自己以下 4 个问题：                │
+│ □ 交付物格式明确？（代码/文档/图片） │
+│ □ 技术选型/偏好明确？               │
+│ □ 优先级明确？（性能/可读性/速度）  │
+│ □ 范围边界明确？（验收标准）        │
+└─────────────────────────────────────┘
+    │
+    ├─ 有任一模糊 ──→ 🛑 触发 Interview（最多 5 问，2 轮上限）
+    │                  格式：选择题 + 1 个开放题
+    │                  输出：写入 memory/YYYY-MM-DD.md
+    │
+    ▼ 全部明确
+┌─────────────────────────────────────┐
+│ 步骤 2: 架构复杂度评估              │
+│ 问自己以下 4 个问题：                │
+│ □ 是否涉及新领域/新技术栈？         │
+│ □ 是否影响现有系统架构？            │
+│ □ 是否有重大技术选型决策？          │
+│ □ 预估工作量 > 1 天？               │
+└─────────────────────────────────────┘
+    │
+    ├─ 全部否 ──→ 进入编码循环（快循环）
+    │              直接调用 acf-executor 执行
+    │
+    ▼ 有任一是
+┌─────────────────────────────────────┐
+│ 步骤 3: 架构循环（慢循环）           │
+│ 3.1 DevMate 手工创建架构草稿         │
+│     → /workspace/mynotes/<Project>/ │
+│       docs/architecture/draft.md    │
+│ 3.2 找老板评审草稿（关键决策点）     │
+│     - 技术选型                      │
+│     - 模块边界                      │
+│     - 数据流向                      │
+│ 3.3 老板确认后 → 派给 OpenCode       │
+│     /zcf/arch-doc "<主题>"          │
+│ 3.4 对比评审（mynotes vs 编码仓库）  │
+│     - 一致 → 架构定稿，进入步骤 3.5   │
+│     - 不一致 → 返回步骤 3.1          │
+│ 3.5 acf-sync 同步 → 进入编码循环     │
+└─────────────────────────────────────┘
+```
+
+---
+
+#### 3.4.2 架构循环 ↔ 编码循环 切换规则
+
+**进入架构循环的条件**（满足任一即切换）:
+
+| 条件 | 严重性 | 行动 |
+|------|--------|------|
+| ❌ 架构缺陷（严重） | 严重 | 暂停编码，返回架构循环 |
+| ❌ 技术选型变更 | 严重 | 暂停编码，返回架构循环 |
+| ❌ 需求重大变更（>30%） | 严重 | 暂停编码，返回架构循环 |
+| ❌ 新增模块 | 中等 | 评估后决定是否返回架构循环 |
+| ❌ 老板决策 | 严重 | 立即返回架构循环 |
+| ❌ 架构违规（评审发现） | 严重 | 暂停任务，返回架构循环 |
+| ❌ 依赖方向错误（评审发现） | 严重 | 暂停任务，返回架构循环 |
+| ❌ 评审发现 P0 问题 | 严重 | 暂停后续任务，返回架构循环 |
+
+**保持编码循环的条件**（满足全部即继续）:
+
+| 条件 | 说明 |
+|------|------|
+| ✅ 任务在已定稿架构范围内 | 无需架构调整 |
+| ✅ 技术选型无变更 | 沿用已有决策 |
+| ✅ 偏差为轻微级别 | 记录 CHANGELOG 即可 |
+| ✅ 老板无新决策 | 按原计划执行 |
+
+---
+
+#### 3.4.3 如何保证严格遵循（执行机制）
+
+**1. 文件化检查清单**（而非上下文记忆）
+
+每次任务接收前，DevMate 必须读取：
+- `/workspace/acf-workflow/docs/decision-tree.md`（决策树）
+- `/workspace/acf-workflow/docs/acf-cheatsheet.md`（快速参考）
+
+**2. 强制写入记忆文件**
+
+任务接收后 1 分钟内，必须写入 `memory/YYYY-MM-DD.md`：
+```markdown
+## In Progress
+- [ ] [任务 ID] 任务描述
+  - 需求澄清状态：✅ 已完成 / 🛑 待 Interview
+  - 架构评估：🟢 简单（直接编码）/ 🟡 复杂（需架构循环）
+  - 当前阶段：架构草稿 / 编码中 / 评审中
+```
+
+**3. Gateway Restart 恢复检查**
+
+收到 GatewayRestart 通知后，必须：
+1. 读取 `memory/YYYY-MM-DD.md` 的 `## In Progress` 部分
+2. 读取 `temp/*.plan.md` 恢复未完成任务
+3. 检查决策树状态（是否卡在 Interview/架构评审）
+
+**4. 违反决策树的后果与修复**
+
+| 违规行为 | 后果 | 修复方案 |
+|---------|------|---------|
+| 跳过 Interview 直接执行 | 需求理解偏差，返工 | 暂停任务 → 补 Interview → 更新记忆 |
+| 未评估复杂度直接编码 | 架构缺陷，后期大改 | 暂停 → 补架构草稿 → 对比评审 |
+| 编码架构师写提案仓库 | 仓库权限混乱 | 删除错误文件 → 更新触发器阻止 |
+| 未写入记忆文件 | Gateway Restart 后丢失上下文 | 立即补写 → 设置 cron 提醒 |
+
+---
+
+#### 3.4.4 快速参考卡（打印版）
+
+```
+┌─────────────────────────────────────────────────────────┐
+│           ACF 工作流决策树 - 快速参考卡                  │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│ 收到任务 → 问自己 4 个问题（需求澄清）                    │
+│           ├─ 有模糊 → Interview（5 问，2 轮）            │
+│           └─ 全明确 → 问自己 4 个问题（复杂度评估）      │
+│                        ├─ 全否 → 编码循环（直接执行）    │
+│                        └─ 有是 → 架构循环（草稿→评审）   │
+│                                                         │
+│ 编码中发现问题 → 判断严重性                             │
+│           ├─ 严重（架构/选型/需求变更）→ 返回架构循环    │
+│           └─ 轻微（偏差/补充）→ 记录 CHANGELOG 继续      │
+│                                                         │
+│ 记忆规则：                                              │
+│ - 每日琐事 → memory/YYYY-MM-DD.md                       │
+│ - 重大决策 → MEMORY.md                                  │
+│ - 任务状态 → 立即写入，不要等"稍后"                       │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 4. 文档结构
 
 ### 4.1 提案仓库结构（仅 DevMate 可写）
@@ -344,33 +509,99 @@ skill_use acf-sync list=true
 
 ---
 
-### 4.3 状态追踪结构
+### 4.3 状态追踪结构（双层记忆）
 
+#### 全局记忆（跨项目）
+
+**位置**: `memory/YYYY-MM-DD.md`（工作区根目录）
+
+**用途**: 记录当天所有项目的关键事件、决策、状态变更
+
+**格式**: 见 `docs/decision-tree.md#4.2`
+
+---
+
+#### 项目记忆（单项目）⭐
+
+**位置**: `/workspace/<Project>/.acf/`
+
+**用途**: 追踪项目级进展，支持重启后快速恢复
+
+**目录结构**:
 ```
 /workspace/<Project>/.acf/
 ├── status/
-│   ├── YYYY-MM-DD-status.md     # 每日状态报告（acf-status 生成）
-│   └── current-phase.md         # 当前阶段概览
+│   ├── current-task.md        # 当前任务状态（⭐重启恢复用）
+│   ├── current-phase.md       # 当前阶段概览
+│   └── YYYY-MM-DD-status.md   # 每日状态报告（acf-status 生成）
 ├── temp/
-│   ├── task-plans/              # 任务计划
-│   └── arch-issues.md           # 架构问题记录
+│   ├── task-plans/            # 任务计划（phase*-tasks.md）
+│   ├── arch-issues.md         # 架构问题记录
+│   └── execution-log.md       # 执行日志
 └── config/
-    └── acf-triggers.yaml        # 触发器配置
+    └── acf-triggers.yaml      # 触发器配置
 ```
+
+**核心文件**: `current-task.md`（重启恢复的关键）
+
+**完整格式**: 见 `docs/decision-tree.md#4.2`
+
+---
 
 ### 4.3.1 状态更新规则
 
 #### 自动更新触发
-- **Task 开始** → 更新状态为"进行中"
-- **Task 完成** → 更新进度百分比
-- **评审完成** → 更新偏差统计
-- **每日 9:00** → 生成每日状态报告（cron）
+
+| 事件 | 更新文件 | 更新时机 |
+|------|---------|---------|
+| 任务开始 | `.acf/status/current-task.md` | 调用 acf-executor 前 |
+| 任务完成 | `.acf/status/current-task.md` | 评审通过后 |
+| 阶段完成 | `.acf/status/current-phase.md` | 所有任务完成后 |
+| 架构变更 | `.acf/temp/arch-issues.md` | 发现问题时 |
+| 每日站会 | `.acf/status/YYYY-MM-DD-status.md` | 每日 9:00（cron） |
 
 #### 更新内容
+
+**current-task.md**（任务级）:
 - 任务进度表（完成数/总数/百分比）
+- 当前任务详情（ID、描述、验收标准）
+- 下一步行动
+
+**current-phase.md**（阶段级）:
+- 阶段目标
+- 任务列表与状态
+- 阻塞点
+
+**YYYY-MM-DD-status.md**（日报）:
 - 偏差追踪表（今日/累计）
 - 效率指标（本周/累计）
-- 阻塞点列表（如有）
+- 技术债务汇总
+
+---
+
+### 4.3.2 Gateway Restart 恢复流程
+
+**收到 GatewayRestart 通知后，必须**:
+
+```bash
+# 步骤 1: 读取全局记忆（了解当天整体情况）
+cat memory/YYYY-MM-DD.md | grep -A 10 "## In Progress"
+
+# 步骤 2: 遍历活跃项目（恢复具体进展）
+for project in /workspace/*/; do
+    if [ -f "$project/.acf/status/current-task.md" ]; then
+        echo "=== $(basename $project) ==="
+        cat "$project/.acf/status/current-task.md"
+    fi
+done
+
+# 步骤 3: 检查决策树状态
+# - Interview 记录 → memory/YYYY-MM-DD.md
+# - 架构草稿 → mynotes/<Project>/docs/architecture/draft.md
+# - 待确认事项 → memory/YYYY-MM-DD.md
+```
+
+**输出**: 重启恢复报告（主动汇报给老板）
 
 ---
 
@@ -391,6 +622,7 @@ skill_use acf-sync list=true
 | `acf-flow` | 任务自动流转 | Task 评审通过后获取下一个任务 |
 | `acf-fix` | 创建修复任务 | 评审发现 P0/P1 问题时 |
 | `acf-sync` | 同步提案仓库 → 编码仓库 | 架构定稿后 |
+| **`acf-executor`** | **执行任务（ACP 驱动 OpenCode）** | **任务执行时** |
 
 ### 5.3 DevMate 典型工作流
 
@@ -411,7 +643,9 @@ skill_use acf-sync list=true
    ↓
 3. 编码循环
    ↓
-   DevMate → OpenCode: task(prompt="Task 001: ...")
+   DevMate → acf-executor: skill_use acf-executor task="Task 001: ..."
+   ↓
+   OpenCode 通过 ACP 执行任务
    ↓
    DevMate → OpenCode: /zcf/task-review "Task 001 完成"
    ↓
@@ -434,6 +668,9 @@ skill_use acf-sync list=true
 skill_use acf-status mode=brief      # 简要报告
 skill_use acf-status mode=full       # 完整报告
 skill_use acf-status mode=next       # 仅下一步
+
+# 执行任务（ACP 驱动 OpenCode）
+skill_use acf-executor task="Task 001: 创建 Crawler 基类" cwd="/workspace/ecommerce"
 
 # 获取下一个任务
 skill_use acf-flow --next
@@ -471,9 +708,72 @@ skill_use acf-sync list=true         # 查看同步列表
 
 ---
 
-## 7. 快速启动
+## 7. ACP 配置要求
 
-### 7.1 新项目初始化
+### 7.1 必需配置 (`~/.openclaw/openclaw.json`)
+
+```json5
+{
+  "acp": {
+    "enabled": true,
+    "backend": "acpx",
+    "defaultAgent": "opencode",
+    "allowedAgents": ["opencode", "codex", "claude"],
+    "maxConcurrentSessions": 4
+  },
+  "plugins": {
+    "entries": {
+      "acpx": {
+        "enabled": true,
+        "config": {
+          "permissionMode": "approve-all",
+          "nonInteractivePermissions": "deny"
+        }
+      }
+    }
+  },
+  "skills": {
+    "load": {
+      "extraDirs": [
+        "~/.agents/skills",
+        "/workspace/acf-workflow/skills"
+      ]
+    }
+  }
+}
+```
+
+### 7.2 检查命令
+
+```bash
+# 检查 ACP 状态
+/acp doctor
+
+# 检查配置
+openclaw config show acp.enabled
+openclaw config show plugins.entries.acpx.enabled
+
+# 列出可用 Agents
+agents_list
+```
+
+### 7.3 安装 OpenCode
+
+```bash
+# 检查是否安装
+opencode --version
+
+# 安装（如未安装）
+npm install -g opencode
+```
+
+**当前版本**: v1.3.7+
+
+---
+
+## 8. 快速启动
+
+### 8.1 新项目初始化
 
 ```bash
 # 1. 创建项目目录
@@ -495,6 +795,7 @@ cat > /workspace/$PROJECT_NAME/AGENTS.md << 'EOF'
 - `skill_use acf-flow` - 获取下一个任务
 - `skill_use acf-fix` - 创建修复任务
 - `skill_use acf-sync` - 同步架构文档
+- `skill_use acf-executor` - 执行任务（ACP 驱动 OpenCode）
 
 ### 编码架构师（OpenCode/Claude Code）
 - OpenCode:   /zcf/arch-doc, /zcf/task-review, /zcf/status
@@ -506,7 +807,7 @@ cat > /workspace/$PROJECT_NAME/AGENTS.md << 'EOF'
 EOF
 ```
 
-### 7.2 每日工作流
+### 8.2 每日工作流
 
 ```bash
 # 早上：查看状态
@@ -515,8 +816,11 @@ skill_use acf-status mode=brief
 # 开始编码前：确认架构文档最新
 skill_use acf-sync list=true
 
+# 执行任务
+skill_use acf-executor task="Task 001: 创建 Crawler 基类" cwd="/workspace/ecommerce"
+
 # 任务完成：评审
-# DevMate → OpenCode: /zcf/task-review "Task XXX 完成"
+# DevMate → OpenCode: /zcf/task-review "Task 001 完成"
 
 # 获取下一个任务
 skill_use acf-flow --next
@@ -527,7 +831,7 @@ skill_use acf-flow --next
 
 ---
 
-## 8. 切换到慢循环（架构循环）的条件
+## 9. 切换到慢循环（架构循环）的条件
 
 满足以下**任一条件**即切换到慢循环：
 
@@ -543,7 +847,7 @@ skill_use acf-flow --next
 
 ---
 
-## 9. 效率指标
+## 10. 效率指标
 
 | 指标 | 目标值 | 测量方式 |
 |------|--------|---------|
@@ -552,13 +856,16 @@ skill_use acf-flow --next
 | 同步执行时间 | < 30 秒 | acf-sync 计时 |
 | 偏差检测自动化率 | > 80% | 自动/手动比例 |
 | 综合效率提升 | > 2x | 对比单仓库手动管理 |
+| **ACP 任务启动时间** | **< 5 秒** | **sessions_spawn 计时** |
+| **OpenCode 响应时间** | **< 30 秒** | **首次输出计时** |
 
 ---
 
-## 10. 变更日志
+## 11. 变更日志
 
 | 日期 | 版本 | 变更 | 理由 |
 |------|------|------|------|
+| 2026-03-30 | v3.1 | **ACP 驱动 OpenCode 实现** | 添加 acf-executor Skill，配置 ACP，实现 `sessions_spawn(runtime="acp")` |
 | 2026-03-30 | v3.0 | 角色与命令澄清 | 明确 DevMate vs 编码架构师、命令格式差异、仓库权限 |
 | 2026-03-29 | v2.1 | 添加任务流转规则 | Task 001 评审后发现设计遗漏，需自动流转 |
 | 2026-03-29 | v2.1 | 添加修复任务管理 | 评审发现的问题需跟踪管理 |
@@ -598,10 +905,13 @@ skill_use acf-flow --next
 | `acf-skills-guide.md` | acf-workflow Skills 使用指南 |
 | `acf-quickstart.md` | 新项目快速启动指南 |
 | `acf-cheatsheet.md` | 快速参考卡 |
+| **`acf-acp-setup-complete.md`** | **ACP 配置与测试报告** |
+| **`acf-opencode-driver-comparison.md`** | **OpenCode 驱动方式比较** |
+| **`acf-env-usage.md`** | **环境变量使用指南** |
 
 ---
 
-**版本**: v3.0  
+**版本**: v3.1  
 **状态**: 生效中  
 **下次评审**: 2026-04-05  
 **维护人**: DevMate
