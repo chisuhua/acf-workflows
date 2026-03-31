@@ -28,6 +28,59 @@
 | **评审员** | OpenCode (运行 task-review) | 任务评审、偏差检查 | DevMate 评审命令 | 评审报告 |
 | **分析师** | OpenCode (运行 status) | 状态分析、进度报告 | DevMate 状态查询 | 进度报告 |
 
+## 🔒 Claims 防重复机制（新增）
+
+**用途**: 防止 Gateway Restart 后重复 Spawn 任务
+
+**文件位置**: `.acf/temp/claims.json`
+
+**结构**:
+```json
+{
+  "Task 001": {
+    "agent_id": "agent:opencode:acp:xxx",
+    "started_at": "2026-04-01T00:30:00Z",
+    "expires_at": "2026-04-01T02:30:00Z",
+    "status": "executing"
+  }
+}
+```
+
+**管理命令**:
+```bash
+# 查看活跃 claims
+source scripts/lib/claims.sh && list_claims
+
+# 释放 claim
+source scripts/lib/claims.sh && release_claim "Task 001"
+
+# 清理过期 claims
+bash scripts/cleanup-claims.sh
+```
+
+## ⚡ 并行执行策略（新增）
+
+**关键任务**: 串行执行 → 立即评审 → 决策点
+
+**非关键任务**: 并行执行（最多 4 个）→ 批量评审
+
+**任务计划标记**:
+```markdown
+| Task ID | 任务名称 | 依赖 | 并行组 | 关键 | 状态 |
+|---------|---------|------|--------|------|------|
+| Task 001 | 创建 Crawler 基类 | 无 | group-A | 是 | pending |
+| Task 002 | 实现重试机制 | 无 | group-A | 否 | pending |
+```
+
+**执行命令**:
+```bash
+# 串行执行（默认）
+skill_use acf-flow
+
+# 并行执行（关键任务串行，非关键任务并行）
+skill_use acf-flow --parallel
+```
+
 ---
 
 ## 📊 完整工作流图

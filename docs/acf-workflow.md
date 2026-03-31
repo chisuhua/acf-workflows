@@ -760,48 +760,53 @@ skill_use acf-sync list=true
 
 ---
 
-### 4.3.2 Gateway Restart 恢复流程（P0 优化版）
+### 4.3.2 Gateway Restart 恢复流程（claims.json 优化版）
 
 **收到 GatewayRestart 通知后，必须**（优化后 30 秒 → 3 秒）:
 
 ```bash
-# 步骤 1: 读取状态机（3 秒快速恢复）⭐
-for project in /workspace/*/; do
-    if [ -f "$project/.acf/status/current-task.md" ]; then
-        # 仅读取状态机部分（前 30 行）
-        echo "=== $(basename $project) ==="
-        head -30 "$project/.acf/status/current-task.md" | grep -A 15 "## 状态机"
+# 步骤 1: 读取 claims.json（快速恢复，3 秒）⭐
+CLAIMS_FILE=".acf/temp/claims.json"
+if [ -f "$CLAIMS_FILE" ]; then
+    echo "=== 进行中的任务 ==="
+    cat "$CLAIMS_FILE" | jq -r 'to_entries[] | "\(.key): \(.value.agent_id) (\(.value.status))"'
+fi
+
+# 步骤 2: 检查每个任务 session 是否存活
+for task_id in $(cat "$CLAIMS_FILE" | jq -r 'keys[]'); do
+    agent_id=$(jq -r --arg id "$task_id" '.[$id].agent_id' "$CLAIMS_FILE")
+    
+    # 检查 session 是否存活
+    if openclaw sessions list 2>/dev/null | grep -q "$agent_id"; then
+        echo "✅ $task_id: 执行中 ($agent_id)"
+    else
+        echo "⚠️  $task_id: session 已丢失，需要恢复"
+        # 释放 claim
+        source scripts/lib/claims.sh && release_claim "$task_id"
     fi
 done
 
-# 步骤 2: 根据状态执行恢复动作
-# | 状态             | 恢复动作                              |
-# |------------------|--------------------------------------|
-# | IDLE             | 汇报"无待办任务"                      |
-# | EXECUTING        | 检查 OpenCode session 状态            |
-# | WAITING_REVIEW   | 提醒运行 /zcf/task-review            |
-# | BLOCKED          | 汇报阻塞原因                          |
-# | DONE             | 执行 acf-flow --next                 |
-# | INTERVIEW        | 继续 Interview 流程                   |
-
-# 步骤 3: 读取全局记忆（仅当状态为 INTERVIEW/BLOCKED 时）
-cat memory/YYYY-MM-DD.md | grep -A 10 "## In Progress"
+# 步骤 3: 读取状态机（仅当 claims.json 为空时）
+if [ ! -s "$CLAIMS_FILE" ] || [ "$(cat "$CLAIMS_FILE" | jq 'length')" -eq 0 ]; then
+    echo "=== 状态机（备用）==="
+    cat .acf/status/current-task.md | grep -A 15 "## 状态机"
+fi
 ```
 
-**状态机恢复决策表**:
+**恢复决策表**:
 
-| 当前状态 | 下一步动作 | Gateway Restart 恢复动作 |
-|----------|-----------|------------------------|
-| `IDLE` | 无 | 汇报"无待办任务" |
-| `EXECUTING` | `/zcf/task-review` | 检查 OpenCode session 是否存活 |
-| `WAITING_REVIEW` | `/zcf/task-review` | 提醒运行评审命令 |
-| `BLOCKED` | 等待架构调整 | 汇报阻塞原因，等待老板决策 |
-| `DONE` | `acf-flow --next` | 自动执行获取下一个任务 |
-| `INTERVIEW` | 继续 Interview | 读取 memory/ 继续需求澄清 |
+| claims.json 状态 | Session 状态 | 恢复动作 |
+|-----------------|-------------|---------|
+| 有任务 | 存活 | 继续监控，等待完成 |
+| 有任务 | 丢失 | 释放 claim，通知 DevMate |
+| 空 | - | 读取状态机（备用） |
 
 **输出**: 重启恢复报告（主动汇报给老板）
 
-**收益**: 恢复时间从 30 秒 → **3 秒**（仅读取状态机，无需解析全文）
+**收益**:
+- 恢复时间从 30 秒 → **3 秒**（单文件查询 vs 遍历目录）
+- 支持并行任务追踪（claims.json 包含所有任务）
+- 自动检测 session 丢失并释放 claim
 
 ---
 

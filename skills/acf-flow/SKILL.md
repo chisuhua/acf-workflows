@@ -19,9 +19,34 @@
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `action` | str | ❌ | 动作：`next`（默认）/`task`（指定任务） |
-| `task_id` | str | ❌ | 指定任务 ID（如 `Task 001`） |
-| `phase` | str | ❌ | 指定阶段（如 `phase1`） |
+| `--parallel` | bool | ❌ | 是否并行执行非关键任务（默认 false） |
+| `--max-concurrent` | int | ❌ | 最大并发数（默认：配置值或 4） |
+
+## 并行执行策略（P3 新增）
+
+**关键任务**: 串行执行 → 立即评审 → 决策点
+
+**非关键任务**: 并行执行（最多 max-concurrent 个）→ 批量评审
+
+**任务计划格式**:
+```markdown
+| Task ID | 任务名称 | 依赖 | 并行组 | 关键 | 状态 |
+|---------|---------|------|--------|------|------|
+| Task 001 | 创建 Crawler 基类 | 无 | group-A | 是 | pending |
+| Task 002 | 实现重试机制 | 无 | group-A | 否 | pending |
+```
+
+**使用示例**:
+```bash
+# 串行执行（默认）
+skill_use acf-flow
+
+# 并行执行（关键任务串行，非关键任务并行）
+skill_use acf-flow --parallel
+
+# 指定最大并发数
+skill_use acf-flow --parallel --max-concurrent 2
+```
 
 ---
 

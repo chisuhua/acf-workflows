@@ -1,0 +1,16 @@
+{
+  "name": "cleanup-claims",
+  "schedule": {
+    "kind": "cron",
+    "expr": "0 * * * *"
+  },
+  "payload": {
+    "kind": "systemEvent",
+    "text": "bash /workspace/acf-workflow/scripts/cleanup-claims.sh"
+  },
+  "sessionTarget": "isolated",
+  "delivery": {
+    "mode": "none"
+  },
+  "enabled": true
+}

@@ -24,7 +24,33 @@
 | `cwd` | str | ❌ | 工作目录（默认：`/workspace/ecommerce`） |
 | `mode` | str | ❌ | 执行模式：`run`（一次性）/`session`（持久）（默认：run） |
 | `label` | str | ❌ | 任务标签（默认：任务 ID） |
-| `parallel` | bool | ❌ | 是否并行执行（默认：false） |
+
+## Claims 防重复机制（P1 新增）
+
+**自动检查**: 执行前自动检查 claims.json，防止重复 Spawn
+
+**配置参数**:
+```json5
+{
+  acf: {
+    executor: {
+      claimTimeoutMinutes: 120  // claim 过期时间（分钟）
+    }
+  }
+}
+```
+
+**手动管理**:
+```bash
+# 查看活跃 claims
+source scripts/lib/claims.sh && list_claims
+
+# 释放 claim（任务完成后手动释放）
+source scripts/lib/claims.sh && release_claim "Task 001"
+
+# 强制重新执行（先释放 claim）
+source scripts/lib/claims.sh && release_claim "Task 001" && skill_use acf-executor task="Task 001: ..."
+```
 
 ---
 

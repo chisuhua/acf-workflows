@@ -1,19 +1,31 @@
 #!/bin/bash
-# execute-task.sh — ACP 驱动 OpenCode 执行任务脚本
+# execute-task.sh — ACP 驱动 OpenCode 执行任务脚本（集成 claims 防重复机制）
 # 用法：./execute-task.sh [task_description] [cwd] [mode] [label]
 # 
 # 环境变量:
 #   PROJECT_PATH - 项目根目录 (默认：/workspace/ecommerce)
+#   CLAIMS_FILE  - claims 文件路径 (默认：$PROJECT_PATH/.acf/temp/claims.json)
 
 set -e
 
 # 支持环境变量配置
 PROJECT_PATH="${PROJECT_PATH:-/workspace/ecommerce}"
+CLAIMS_FILE="${CLAIMS_FILE:-$PROJECT_PATH/.acf/temp/claims.json}"
 
 TASK="${1:-}"
 CWD="${2:-$PROJECT_PATH}"
 MODE="${3:-run}"
 LABEL="${4:-task}"
+
+# 提取 Task ID
+TASK_ID=$(echo "$TASK" | grep -oE 'Task [0-9]+' | head -1)
+
+# 加载 claims 库
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../../scripts/lib/claims.sh"
+
+# 配置参数
+CLAIMS_TIMEOUT=$(openclaw config show acf.executor.claimTimeoutMinutes 2>/dev/null || echo 120)
 
 # 检查参数
 if [ -z "$TASK" ]; then
@@ -43,6 +55,27 @@ if ! openclaw config show acp.enabled &> /dev/null; then
 fi
 
 echo "✅ ACP 已启用"
+echo ""
+
+# Claims 检查（防重复 Spawn）
+echo "🔒 检查任务 claim..."
+claims_init
+cleanup_claims "$CLAIMS_TIMEOUT" > /dev/null
+
+CLAIM_RESULT=$(check_claim "$TASK_ID" 2>/dev/null || echo "not_exists")
+if [[ "$CLAIM_RESULT" == exists:* ]]; then
+    AGENT_ID=$(echo "$CLAIM_RESULT" | cut -d':' -f2)
+    STARTED_AT=$(echo "$CLAIM_RESULT" | cut -d':' -f3)
+    echo "⚠️  任务 $TASK_ID 已在处理中"
+    echo "   Agent: $AGENT_ID"
+    echo "   开始时间：$STARTED_AT"
+    echo ""
+    echo "💡 如需强制重新执行，先释放 claim:"
+    echo "   source scripts/lib/claims.sh && release_claim \"$TASK_ID\""
+    exit 0
+fi
+
+echo "✅ 任务 $TASK_ID 可以执行"
 echo ""
 
 # 执行任务
@@ -108,18 +141,36 @@ update_state "EXECUTING" "IDLE" "/zcf/task-review \"$TASK 完成\""
 TASK_PROMPT=$(build_task_prompt "$TASK" "$CWD")
 
 # 使用 OpenClaw sessions spawn 启动 ACP 驱动的 OpenCode（编码助手角色）
-openclaw sessions spawn \
+echo "🚀 启动 ACP session..."
+SESSION_OUTPUT=$(openclaw sessions spawn \
   --runtime acp \
   --agent-id opencode \
   --task "$TASK_PROMPT" \
   --cwd "$CWD" \
   --mode "$MODE" \
-  --label "$LABEL"
+  --label "$LABEL" 2>&1)
+
+echo "$SESSION_OUTPUT"
+
+# 提取 agent_id
+AGENT_ID=$(echo "$SESSION_OUTPUT" | grep -oE 'agent:opencode:acp:[a-f0-9-]+' | head -1)
+
+if [ -n "$AGENT_ID" ]; then
+    # 写入 claim
+    write_claim "$TASK_ID" "$AGENT_ID" "$CLAIMS_TIMEOUT"
+    
+    # 更新状态机
+    update_state "EXECUTING" "IDLE" "/zcf/task-review \"$TASK 完成\"" "$AGENT_ID"
+else
+    echo "⚠️  警告：无法提取 agent_id，claim 未写入"
+fi
 
 echo ""
 echo "✅ 任务已启动"
 echo ""
+echo "Session Key: $AGENT_ID"
+echo ""
 echo "监控命令:"
 echo "  查看状态：openclaw sessions list"
-echo "  查看日志：openclaw sessions history <session-key>"
-echo "  停止任务：/acp cancel <session-key>"
+echo "  查看日志：openclaw sessions history $AGENT_ID"
+echo "  停止任务：/acp cancel $AGENT_ID"
