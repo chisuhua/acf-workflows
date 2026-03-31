@@ -50,7 +50,8 @@ cleanup_claims "$CLAIMS_TIMEOUT" > /dev/null
 # 判断是否是关键任务
 is_critical_task() {
     local task_id="$1"
-    local critical=$(grep "^| $task_id" "$PLAN_FILE" | cut -d'|' -f5 | xargs)
+    # 列索引：| Task ID(2) | 任务名称 (3) | 依赖 (4) | 并行组 (5) | 关键 (6) | 状态 (7) |
+    local critical=$(grep "^| $task_id" "$PLAN_FILE" | awk -F'|' '{print $6}' | xargs)
     if [[ "$critical" == "$CRITICAL_MARKER" ]] || [[ "$critical" == "true" ]] || [[ "$critical" == "yes" ]]; then
         return 0  # 是关键任务
     fi
@@ -60,7 +61,7 @@ is_critical_task() {
 # 识别下一个关键任务
 identify_next_critical_task() {
     grep -E "^\| Task [0-9]+" "$PLAN_FILE" | \
-    while IFS='|' read -r task_id task_name depends critical parallel_group status estimated; do
+    while IFS='|' read -r _ task_id task_name depends parallel_group critical status estimated; do
         task_id=$(echo "$task_id" | xargs)
         critical=$(echo "$critical" | xargs)
         status=$(echo "$status" | xargs)
@@ -81,7 +82,7 @@ identify_next_critical_task() {
 # 识别可并行任务（排除关键任务和有依赖的任务）
 identify_parallel_tasks() {
     grep -E "^\| Task [0-9]+" "$PLAN_FILE" | \
-    while IFS='|' read -r task_id task_name depends critical parallel_group status estimated; do
+    while IFS='|' read -r _ task_id task_name depends parallel_group critical status estimated; do
         task_id=$(echo "$task_id" | xargs)
         critical=$(echo "$critical" | xargs)
         depends=$(echo "$depends" | xargs)
