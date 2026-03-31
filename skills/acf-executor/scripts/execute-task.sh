@@ -52,6 +52,31 @@ echo "执行模式：$MODE"
 echo "任务标签：$LABEL"
 echo ""
 
+# 状态机更新（P0 新增）
+update_state() {
+    local state="$1"
+    local prev_state="$2"
+    local next_action="$3"
+    local block_reason="${4:-}"
+    local status_file="$CWD/.acf/status/current-task.md"
+    
+    if [ -f "$status_file" ]; then
+        # 更新现有文件
+        sed -i "s/\*\*当前状态\*\*: .*/\*\*当前状态\*\*: \`$state\`/" "$status_file"
+        sed -i "s/\*\*最后状态转换\*\*: .*/\*\*最后状态转换\*\*: \`$prev_state\` → \`$state\` ($(date +'%Y-%m-%d %H:%M:%S'))/" "$status_file"
+        sed -i "s/\*\*下一步动作\*\*: .*/\*\*下一步动作\*\*: \`$next_action\`/" "$status_file"
+        if [ -n "$block_reason" ]; then
+            sed -i "s/\*\*阻塞原因\*\*: .*/\*\*阻塞原因\*\*: \`$block_reason\`/" "$status_file"
+        fi
+        echo "✅ 状态机已更新：$prev_state → $state"
+    else
+        echo "⚠️  警告：状态文件不存在 $status_file"
+    fi
+}
+
+# 执行前更新状态：IDLE → EXECUTING
+update_state "EXECUTING" "IDLE" "/zcf/task-review \"$TASK 完成\""
+
 # 使用 OpenClaw sessions spawn 启动 ACP 驱动的 OpenCode
 openclaw sessions spawn \
   --runtime acp \

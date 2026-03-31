@@ -8,6 +8,32 @@
 
 ## 🎉 重大更新
 
+### 0. 显式状态机（P0 新增）⭐
+
+**问题**: Gateway Restart 恢复依赖遍历文件，效率低（30 秒）
+
+**解决方案**: 在 `.acf/status/current-task.md` 中添加状态机字段
+
+**状态枚举**（6 个）:
+| 状态 | 含义 | 恢复动作 |
+|------|------|---------|
+| `IDLE` | 无任务 | 汇报"无待办" |
+| `EXECUTING` | 任务执行中 | 检查 OpenCode session |
+| `WAITING_REVIEW` | 等待评审 | 提醒运行 `/zcf/task-review` |
+| `BLOCKED` | 阻塞 | 汇报阻塞原因 |
+| `DONE` | 任务完成 | 执行 `acf-flow --next` |
+| `INTERVIEW` | 需求澄清中 | 继续 Interview |
+
+**实现文件**:
+- `templates/current-task-template.md` — 添加状态机模板
+- `skills/acf-executor/scripts/execute-task.sh` — 执行前更新状态
+- `skills/acf-flow/scripts/auto-flow.sh` — 流转时更新状态
+- `docs/acf-workflow.md` — 更新 Gateway Restart 恢复流程
+
+**收益**: 恢复时间从 30 秒 → **3 秒**
+
+---
+
 ### 1. ACP 驱动 OpenCode 实现 ✅
 
 **问题**: 之前 `task()` 函数是占位符，未实现如何驱动 OpenCode

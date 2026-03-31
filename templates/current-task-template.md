@@ -6,6 +6,28 @@
 
 ---
 
+## 状态机（P0 新增）
+
+**当前状态**: `{{STATE}}`  ← 可选值：`IDLE` | `EXECUTING` | `WAITING_REVIEW` | `BLOCKED` | `DONE` | `INTERVIEW`
+
+**允许转换**:
+```
+IDLE → EXECUTING | INTERVIEW
+EXECUTING → WAITING_REVIEW | BLOCKED
+WAITING_REVIEW → EXECUTING | DONE | BLOCKED
+BLOCKED → INTERVIEW | EXECUTING
+DONE → IDLE | EXECUTING
+INTERVIEW → EXECUTING | IDLE
+```
+
+**最后状态转换**: `{{PREV_STATE}}` → `{{STATE}}` (YYYY-MM-DD HH:MM:SS)
+
+**恢复上下文**（Gateway Restart 用）:
+- **下一步动作**: `{{NEXT_ACTION}}`  ← 直接可执行命令
+- **阻塞原因**: `{{BLOCK_REASON}}`  ← 仅 BLOCKED 状态填写
+
+---
+
 ## 任务进度
 
 | 任务 ID | 任务名称 | 状态 | 完成时间 | 评审状态 |

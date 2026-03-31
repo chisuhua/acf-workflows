@@ -40,8 +40,10 @@
 **工作目录**: /workspace/ecommerce
 **Session Key**: agent:opencode:acp:xxx-xxx-xxx
 
-### 状态
-- 🔄 执行中...
+### 状态机更新（P0 新增）
+- **状态转换**: `IDLE` → `EXECUTING`
+- **更新时间**: YYYY-MM-DD HH:MM:SS
+- **下一步动作**: `/zcf/task-review "Task 001 完成"`
 
 ### 监控
 - 查看日志：`sessions_history sessionKey="agent:opencode:acp:xxx"`

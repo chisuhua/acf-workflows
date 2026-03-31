@@ -579,29 +579,48 @@ skill_use acf-sync list=true
 
 ---
 
-### 4.3.2 Gateway Restart 恢复流程
+### 4.3.2 Gateway Restart 恢复流程（P0 优化版）
 
-**收到 GatewayRestart 通知后，必须**:
+**收到 GatewayRestart 通知后，必须**（优化后 30 秒 → 3 秒）:
 
 ```bash
-# 步骤 1: 读取全局记忆（了解当天整体情况）
-cat memory/YYYY-MM-DD.md | grep -A 10 "## In Progress"
-
-# 步骤 2: 遍历活跃项目（恢复具体进展）
+# 步骤 1: 读取状态机（3 秒快速恢复）⭐
 for project in /workspace/*/; do
     if [ -f "$project/.acf/status/current-task.md" ]; then
+        # 仅读取状态机部分（前 30 行）
         echo "=== $(basename $project) ==="
-        cat "$project/.acf/status/current-task.md"
+        head -30 "$project/.acf/status/current-task.md" | grep -A 15 "## 状态机"
     fi
 done
 
-# 步骤 3: 检查决策树状态
-# - Interview 记录 → memory/YYYY-MM-DD.md
-# - 架构草稿 → mynotes/<Project>/docs/architecture/draft.md
-# - 待确认事项 → memory/YYYY-MM-DD.md
+# 步骤 2: 根据状态执行恢复动作
+# | 状态             | 恢复动作                              |
+# |------------------|--------------------------------------|
+# | IDLE             | 汇报"无待办任务"                      |
+# | EXECUTING        | 检查 OpenCode session 状态            |
+# | WAITING_REVIEW   | 提醒运行 /zcf/task-review            |
+# | BLOCKED          | 汇报阻塞原因                          |
+# | DONE             | 执行 acf-flow --next                 |
+# | INTERVIEW        | 继续 Interview 流程                   |
+
+# 步骤 3: 读取全局记忆（仅当状态为 INTERVIEW/BLOCKED 时）
+cat memory/YYYY-MM-DD.md | grep -A 10 "## In Progress"
 ```
 
+**状态机恢复决策表**:
+
+| 当前状态 | 下一步动作 | Gateway Restart 恢复动作 |
+|----------|-----------|------------------------|
+| `IDLE` | 无 | 汇报"无待办任务" |
+| `EXECUTING` | `/zcf/task-review` | 检查 OpenCode session 是否存活 |
+| `WAITING_REVIEW` | `/zcf/task-review` | 提醒运行评审命令 |
+| `BLOCKED` | 等待架构调整 | 汇报阻塞原因，等待老板决策 |
+| `DONE` | `acf-flow --next` | 自动执行获取下一个任务 |
+| `INTERVIEW` | 继续 Interview | 读取 memory/ 继续需求澄清 |
+
 **输出**: 重启恢复报告（主动汇报给老板）
+
+**收益**: 恢复时间从 30 秒 → **3 秒**（仅读取状态机，无需解析全文）
 
 ---
 

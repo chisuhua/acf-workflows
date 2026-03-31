@@ -58,8 +58,27 @@ DELIVERABLES=$(echo "$TASK_SECTION" | grep -A 5 "交付物" | grep -v "交付物
 # 提取验收标准
 ACCEPTANCE=$(echo "$TASK_SECTION" | grep -A 10 "验收标准" | grep -v "验收标准" | grep -v "^--$" | head -10)
 
+# 状态机更新（P0 新增）
+update_state() {
+    local state="$1"
+    local prev_state="$2"
+    local next_action="$3"
+    local status_file="$PROJECT_PATH/.acf/status/current-task.md"
+    
+    if [ -f "$status_file" ]; then
+        sed -i "s/\*\*当前状态\*\*: .*/\*\*当前状态\*\*: \`$state\`/" "$status_file"
+        sed -i "s/\*\*最后状态转换\*\*: .*/\*\*最后状态转换\*\*: \`$prev_state\` → \`$state\` ($(date +'%Y-%m-%d %H:%M:%S'))/" "$status_file"
+        sed -i "s/\*\*下一步动作\*\*: .*/\*\*下一步动作\*\*: \`$next_action\`/" "$status_file"
+        echo "✅ 状态机已更新：$prev_state → $state"
+    fi
+}
+
 # 生成 ACP 驱动的任务执行 JSON
 # 这是给 OpenClaw 的 sessions_spawn 工具使用的
+
+# 更新状态：DONE → IDLE → EXECUTING（准备执行）
+update_state "EXECUTING" "DONE" "skill_use acf-executor task=\"$TASK_ID: $TASK_TITLE\""
+
 cat << EOF
 ## 📋 下一个任务
 
