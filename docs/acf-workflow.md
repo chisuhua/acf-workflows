@@ -9,54 +9,61 @@
 
 ## 1. 核心概念
 
-### 1.1 双循环交织架构
+### 1.1 双循环交织架构（角色澄清版）
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    架构循环（慢循环，三方协作）                   │
-│  参与者：老板 + DevMate + 编码架构师 (OpenCode/Claude Code)       │
+│  参与者：老板 + DevMate + 架构师 (OpenCode/Claude Code 运行 arch-doc) │
 │  频率：按需触发 | 产出：架构决策、标准化架构文档                  │
 │                                                                 │
 │  1. 老板 + DevMate 讨论初步架构                                 │
 │     → 输出：/workspace/mynotes/<Project>/docs/architecture/     │
 │                                                                 │
-│  2. DevMate → 编码架构师发送命令                                │
+│  2. DevMate → 架构师发送命令（通过 ACP session）                 │
 │     OpenCode:   /zcf/arch-doc "电商分析系统"                    │
 │     ClaudeCode: /zcf:arch-doc "电商分析系统"                    │
 │                                                                 │
-│  3. 编码架构师执行 /zcf/arch-doc 工作流                         │
+│  3. 架构师执行 /zcf/arch-doc 工作流                             │
 │     → 输出：/workspace/<Project>/docs/architecture/             │
 │                                                                 │
-│  4. DevMate 对比评审（mynotes vs 编码仓库）                      │
+│  4. DevMate 对比评审（mynotes 提案 vs 编码仓库标准化）            │
 │     ├─ 一致 → 架构定稿，进入编码循环                            │
 │     └─ 不一致 → 返回步骤 1，调整架构                            │
 └─────────────────────────────────────────────────────────────────┘
                               ↓ 架构定稿
 ┌─────────────────────────────────────────────────────────────────┐
 │                    编码循环（快循环，双方协作）                   │
-│  参与者：DevMate + 编码架构师 (OpenCode/Claude Code)             │
+│  参与者：DevMate + 编码助手 (OpenCode/Claude Code 运行 workflow) │
 │  频率：每日执行 | 产出：可运行代码、测试、Git 提交                 │
 │                                                                 │
-│  1. DevMate → 编码架构师发送任务                                │
+│  1. DevMate → 编码助手发送任务（acf-executor 启动 ACP session）   │
 │     skill_use acf-executor task="Task 001: ..."                │
-│     或 sessions_spawn(runtime="acp", agentId="opencode")        │
 │                                                                 │
-│  2. 编码架构师实现代码（通过 ACP 驱动）                          │
+│  2. 编码助手自主实现代码（OpenCode 自行决定如何执行）             │
 │     → 输出：/workspace/<Project>/src/...                        │
 │                                                                 │
-│  3. DevMate → 编码架构师发送评审命令                            │
+│  3. DevMate → 评审员发送评审命令（通过 ACP session 输入）         │
 │     OpenCode:   /zcf/task-review "Task 001 完成"                │
 │     ClaudeCode: /zcf:task-review "Task 001 完成"                │
 │                                                                 │
-│  4. 编码架构师执行自评 → 输出评审报告                           │
+│  4. 评审员执行评审 → 输出报告（给 DevMate 看）                    │
 │                                                                 │
-│  5. DevMate 使用 acf-flow 获取下一个任务                         │
+│  5. DevMate 查看报告 → acf-flow → 下一任务                       │
 │     ├─ 无问题 → 继续 Task 002                                   │
 │     └─ 发现问题 → 返回架构循环，和老板沟通                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**关键实现**: 编码循环使用 **ACP 驱动 OpenCode**（`sessions_spawn(runtime="acp", agentId="opencode")`）
+**关键实现**: 
+- 编码循环使用 **ACP 驱动 OpenCode**（`sessions_spawn(runtime="acp", agentId="opencode")`）
+- **角色说明**: OpenCode/Claude Code 根据接收的命令扮演不同角色
+  - `/zcf/arch-doc` → **架构师** (Architect)
+  - `/zcf/workflow` 或自主执行 → **编码助手** (Encoding Assistant)
+  - `/zcf/task-review` → **评审员** (Reviewer)
+  - `/zcf/status` → **分析师** (Analyst)
+
+**DevMate 角色**: **终端操作员**（通过 ACP session 输入 /zcf/ 命令，唤醒对应角色）
 
 ---
 
@@ -74,41 +81,72 @@
 
 ---
 
-### 1.3 角色与命令对应关系
+### 1.3 角色与命令对应关系（统一术语）
 
-| 角色 | 身份 | 使用的命令/技能 | 命令格式 |
+| 角色 | 身份 | 使用的命令/技能 | 命令格式 | 触发方式 |
 |------|------|----------------|---------|
-| **DevMate** | 你（技术合伙人） | `acf-flow`, `acf-status`, `acf-fix`, `acf-sync`, **`acf-executor`** | OpenClaw Skills |
-| **OpenCode** | 编码架构师 | `/zcf/arch-doc`, `/zcf/task-review`, `/zcf/status` | **斜杠** `/zcf/` |
-| **Claude Code** | 编码架构师 | `/zcf:arch-doc`, `/zcf:task-review`, `/zcf:status` | **冒号** `/zcf:` |
+| **DevMate** | 你（技术合伙人/终端操作员） | `acf-flow`, `acf-status`, `acf-fix`, `acf-sync`, `acf-executor` | OpenClaw Skills | 直接调用 |
+| **架构师** | OpenCode/Claude Code (运行 arch-doc) | `/zcf/arch-doc` | **斜杠** `/zcf/` (OpenCode)<br>**冒号** `/zcf:` (Claude Code) | DevMate 通过 ACP session 输入 |
+| **编码助手** | OpenCode/Claude Code (自主执行任务) | `/zcf/workflow` (可选) | 同上 | OpenCode 自主决定 |
+| **评审员** | OpenCode/Claude Code (运行 task-review) | `/zcf/task-review` | 同上 | DevMate 通过 ACP session 输入 |
+| **分析师** | OpenCode/Claude Code (运行 status) | `/zcf/status` | 同上 | DevMate 通过 ACP session 输入 |
 
 **命令格式差异原因**:
 - OpenCode: 使用 `/command/arg` 格式（斜杠）
 - Claude Code: 使用 `/command:arg` 格式（冒号）
 
-**重要**: `/zcf/` 技能是**编码架构师使用的**，不是 DevMate 直接使用的。DevMate 使用 `acf-*` Skills 来驱动工作流程，其中 `acf-executor` 通过 ACP 驱动 OpenCode 执行任务。
+**重要说明**:
+1. `/zcf/` 技能是**OpenCode/Claude Code 内部角色使用的**，DevMate 作为终端操作员通过 ACP session 输入这些命令
+2. DevMate 使用 `acf-*` Skills 来驱动工作流程（如 `acf-executor` 启动 ACP session）
+3. OpenCode/Claude Code 根据接收的命令**扮演不同角色**（架构师/编码助手/评审员/分析师）
 
 ---
 
 ## 2. Agent 角色与职责
 
-### 2.1 角色矩阵（澄清版）
+### 2.1 角色矩阵（统一术语）
 
 | 角色 | 职责 | 工作目录 | 使用的命令/技能 | 输出路径 |
 |------|------|---------|----------------|---------|
-| **DevMate** | 架构讨论、流程驱动、问题发现 | 双仓库 | `acf-flow`, `acf-status`, `acf-fix`, `acf-sync`, `acf-executor` | 提案仓库 + 编码仓库 |
-| **编码架构师** (OpenCode/Claude Code) | 标准化架构文档生成、任务执行、自评 | 编码仓库 | `/zcf/arch-doc`, `/zcf/task-review`, `/zcf/status` | 仅编码仓库 |
+| **DevMate** | 架构讨论、流程驱动、问题发现、架构对比 | 双仓库 | `acf-flow`, `acf-status`, `acf-fix`, `acf-sync`, `acf-executor` | 提案仓库 + 编码仓库 |
+| **架构师** (OpenCode/Claude Code) | 架构文档生成（运行 arch-doc） | 编码仓库 | `/zcf/arch-doc` | 仅编码仓库 |
+| **编码助手** (OpenCode/Claude Code) | 任务执行、自评（自主执行） | 编码仓库 | `/zcf/workflow` (可选) | 仅编码仓库 |
+| **评审员** (OpenCode/Claude Code) | 任务评审（运行 task-review） | 编码仓库 | `/zcf/task-review` | 仅编码仓库 |
+| **分析师** (OpenCode/Claude Code) | 状态分析（运行 status） | 编码仓库 | `/zcf/status` | 仅编码仓库 |
 | **老板** | 架构决策确认、技术选型审批 | 提案仓库（只读） | 无（人工评审） | - |
+
+**说明**:
+- OpenCode/Claude Code 根据接收的命令**扮演不同角色**
+- DevMate 通过 ACP session 输入 `/zcf/` 命令唤醒对应角色
+- 架构对比由 DevMate 自己执行（对比 mynotes 提案 vs 编码仓库标准化文档）
 
 ---
 
-### 2.2 编码架构师的 /zcf/ 技能列表
+### 2.2 /zcf/ 技能列表（按角色分类）
 
+#### 架构师技能
 | 技能 | 用途 | OpenCode 格式 | Claude Code 格式 | 定义位置 |
 |------|------|--------------|-----------------|---------|
 | `arch-doc` | 架构文档生成（3 阶段：研究→构思→评审） | `/zcf/arch-doc "主题"` | `/zcf:arch-doc "主题"` | `~/.agents/commands/zcf/arch-doc.md` |
+
+#### 编码助手技能（可选，OpenCode 自主决定）
+| 技能 | 用途 | OpenCode 格式 | Claude Code 格式 | 定义位置 |
+|------|------|--------------|-----------------|---------|
+| `workflow` | 代码开发（6 阶段流程） | `/zcf/workflow "任务"` | `/zcf:workflow "任务"` | `~/.agents/commands/zcf/workflow.md` |
+
+#### 评审员技能
+| 技能 | 用途 | OpenCode 格式 | Claude Code 格式 | 定义位置 |
+|------|------|--------------|-----------------|---------|
 | `task-review` | 任务评审（架构一致性检查、偏差识别） | `/zcf/task-review "Task XXX"` | `/zcf:task-review "Task XXX"` | `~/.agents/commands/zcf/task-review.md` |
+
+#### 分析师技能
+| 技能 | 用途 | OpenCode 格式 | Claude Code 格式 | 定义位置 |
+|------|------|--------------|-----------------|---------|
 | `status` | 状态分析（完整/简要/仅下一步） | `/zcf/status [mode]` | `/zcf:status [mode]` | `~/.agents/commands/zcf/status.md` |
+
+#### 协调员技能
+| 技能 | 用途 | OpenCode 格式 | Claude Code 格式 | 定义位置 |
+|------|------|--------------|-----------------|---------|
 | `github-sync` | GitHub 同步（Milestones + Issues） | `/zcf/github-sync "Phase 1"` | `/zcf:github-sync "Phase 1"` | `~/.agents/commands/zcf/github-sync.md` |
 
 ---
@@ -117,13 +155,48 @@
 
 | Skill | 用途 | 调用方式 | 触发条件 |
 |-------|------|---------|---------|
-| `acf-status` | 项目状态分析，生成进度报告 | `skill_use acf-status [mode]` | 每日 9:00 自动 / 手动 |
+| `acf-status` | 项目状态分析，生成进度报告 | `skill_use acf-status [mode]` | 每日 9:00 自动 / 手动 / 新 session |
 | `acf-flow` | 任务自动流转（读取计划 → 下一个任务） | `skill_use acf-flow [--next]` | Task 评审通过后 |
 | `acf-fix` | 修复任务创建（P0/P1 问题） | `skill_use acf-fix action=create` | 评审发现问题时 |
-| `acf-sync` | 同步提案仓库 → 编码仓库 | `skill_use acf-sync [--dry-run]` | 架构定稿后 |
+| `acf-sync` | 同步提案仓库 → 编码仓库 | `skill_use acf-sync [--dry-run]` | 架构定稿后（DevMate 对比一致） |
 | **`acf-executor`** | **任务执行（ACP 驱动 OpenCode）** | `skill_use acf-executor task="..."` | **任务执行时** |
 
 **Skill 定义位置**: `/workspace/acf-workflow/skills/*/SKILL.md`
+
+---
+
+### 2.4 acf-executor 执行流程（修复 2）
+
+```
+1. DevMate 调用 acf-executor
+   skill_use acf-executor task="Task 001: 创建 Crawler 基类" cwd="/workspace/ecommerce"
+
+2. acf-executor 启动 OpenCode（编码助手角色）
+   - 加载 templates/task-prompt.md（含编码助手角色定义）
+   - sessions_spawn(runtime="acp", agentId="opencode", task=prompt)
+   - 更新状态机：IDLE → EXECUTING
+
+3. OpenCode 自主执行代码（内部可能调用 /zcf/workflow，可选）
+   - 读取架构文档
+   - 实现代码
+   - 编写测试
+   - 运行合规检查（bash scripts/check-compliance.sh）
+   - Git 分支开发（feature/task-001-xxx）
+
+4. OpenCode 完成任务
+   - 更新状态机：EXECUTING → WAITING_REVIEW
+   - 等待 DevMate 评审
+
+5. DevMate 运行评审（通过 ACP session 输入）
+   /zcf/task-review "Task 001 完成"
+   → 唤醒评审员角色 → 输出报告
+   → DevMate 查看报告 → acf-flow → 下一任务
+```
+
+**关键点**:
+- OpenCode 执行方式是**自主决定**的（可能调用 /zcf/workflow，也可能直接编码）
+- DevMate 作为**终端操作员**，通过 ACP session 输入 `/zcf/task-review` 唤醒评审员
+- 评审结束后，DevMate 查看报告，决定下一步行动
 
 ---
 
@@ -201,6 +274,48 @@ bash scripts/merge-branches.sh \
   --feature feature/task-002-retry \
   --feature feature/task-003-circuit \
   --feature feature/task-005-storage
+```
+
+---
+
+### 2.6 架构循环→编码循环切换流程（修复 4）
+
+```
+1. 架构师 (arch-doc) 完成架构文档
+   输出：docs/architecture/YYYY-MM-DD-xxx.md
+
+2. DevMate 对比评审（自己执行，不调用技能）
+   - 读取 mynotes 提案草稿
+   - 读取编码仓库标准化文档
+   - 对比一致性
+
+3. 一致 → acf-sync 同步
+   skill_use acf-sync
+   → 同步提案仓库 → 编码仓库
+
+4. acf-executor 进入编码循环
+   skill_use acf-executor task="Task 001: ..."
+   → 启动 OpenCode（编码助手角色）
+   → 开始编码
+```
+
+**DevMate 对比检查清单**:
+- [ ] 架构文档结构一致
+- [ ] 模块边界一致
+- [ ] 接口定义一致
+- [ ] 技术选型一致
+- [ ] ADR 约束一致
+
+**不一致时的处理**:
+```
+1. DevMate 通知架构师（通过 ACP session）
+   /zcf/arch-doc "更新：XXX 模块接口定义"
+
+2. 架构师重新生成文档
+
+3. DevMate 再次对比
+
+4. 一致 → 继续步骤 3-4
 ```
 
 ---
