@@ -139,6 +139,72 @@
 
 ---
 
+### 2.5 Git 分支策略（P0 新增）
+
+**原则**: 每个任务在独立分支上开发，合并前通过合规检查
+
+#### 分支命名规范
+
+```
+格式：feature/<task-id>-<short-desc>
+示例：
+- feature/task-001-crawler-base
+- feature/task-002-retry-mechanism
+- feature/fix-001-null-pointer
+```
+
+#### 分支生命周期
+
+```
+1. 任务开始 → 创建分支
+   git checkout -b feature/task-001-crawler-base main
+
+2. 编码中 → 提交到分支
+   git add . && git commit -m "feat: Crawler 基类实现"
+
+3. 任务完成 → 发起合并请求
+   /zcf/task-review "Task 001 完成"
+
+4. 评审通过 → 合并到 main
+   bash scripts/merge-branches.sh --feature feature/task-001-crawler-base
+
+5. 合并完成 → 删除分支
+   git branch -d feature/task-001-crawler-base
+```
+
+#### 分支保护规则
+
+| 规则 | 说明 | 执行方式 |
+|------|------|---------|
+| ❌ 禁止直接 push main | 所有代码必须通过合并 | `merge-branches.sh` 检查 |
+| ✅ 必须通过合规检查 | 测试覆盖率≥80%，无架构违规 | `check-compliance.sh` |
+| ✅ 必须通过任务评审 | `/zcf/task-review` 自评通过 | 人工确认 |
+| ⚠️ 冲突解决 | 合并前解决所有冲突 | `merge-branches.sh` 检测 |
+
+#### 多任务并行策略
+
+```
+场景：Task 002/003/005 并行执行
+
+分支创建:
+- feature/task-002-retry
+- feature/task-003-circuit
+- feature/task-005-storage
+
+合并顺序:
+1. 逐个合并（检测冲突）
+2. 运行集成测试
+3. 删除已合并分支
+
+命令:
+bash scripts/merge-branches.sh \
+  --feature feature/task-002-retry \
+  --feature feature/task-003-circuit \
+  --feature feature/task-005-storage
+```
+
+---
+
 ## 3. 工作流程
 
 ### 3.1 架构循环流程（三方协作）
