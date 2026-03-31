@@ -1,6 +1,42 @@
-# ZCF 工作流快速参考卡
+# ACF 工作流快速参考卡
 
-**版本**: v2.0 | **更新**: 2026-03-29
+**版本**: v3.2 | **更新**: 2026-03-31
+
+---
+
+## 🌳 任务接收决策树（⭐ 强制）
+
+```
+收到任务
+  │
+  ├─ 需求澄清（4 问）─ 有模糊 → Interview（5 问，2 轮）
+  │                     全明确 ↓
+  ├─ 复杂度评估（4 问）─ 全否 → 编码循环（直接执行）
+  │                     有是 ↓
+  └─ 架构循环 ──→ 草稿 → 老板评审 → OpenCode → 对比 → 同步
+```
+
+**详细流程**: `docs/decision-tree.md`
+
+---
+
+## 📀 双层记忆结构
+
+| 层级 | 位置 | 用途 | 恢复命令 |
+|------|------|------|---------|
+| **全局** | `memory/YYYY-MM-DD.md` | 跨项目日志 | `cat memory/$(date +%Y-%m-%d).md` |
+| **项目** | `<Project>/.acf/status/current-task.md` | 项目进展 | `cat .acf/status/current-task.md` |
+
+**Gateway Restart 恢复**:
+```bash
+# 1. 全局记忆
+cat memory/YYYY-MM-DD.md | grep -A 10 "## In Progress"
+
+# 2. 项目进展
+for p in /workspace/*/; do
+  [ -f "$p/.acf/status/current-task.md" ] && cat "$p/.acf/status/current-task.md"
+done
+```
 
 ---
 
@@ -45,12 +81,12 @@ task(prompt="Task XXX: <描述>", category="quick|deep")
 
 | 用途 | 路径 |
 |------|------|
-| 提案仓库 | `/workspace/mynotes/SkillApps/ecommerce/docs/architecture/` |
-| 编码仓库 | `/workspace/ecommerce/docs/architecture/` |
-| 状态追踪 | `/workspace/ecommerce/status/` |
-| 执行日志 | `~/.openclaw/workspace/docs/workflow/execution-log-template.md` |
-| Agent Skills | `~/.openclaw/workspace/docs/workflow/skills/` |
-| 同步脚本 | `~/.openclaw/workspace/scripts/sync-arch-to-encoding.sh` |
+| 提案仓库 | `/workspace/mynotes/<Project>/docs/architecture/` |
+| 编码仓库 | `/workspace/<Project>/docs/architecture/` |
+| 项目记忆 | `/workspace/<Project>/.acf/` |
+| 全局记忆 | `memory/YYYY-MM-DD.md` |
+| 决策树 | `docs/decision-tree.md` |
+| ACF Skills | `/workspace/acf-workflow/skills/` |
 
 ---
 
@@ -68,10 +104,13 @@ task(prompt="Task XXX: <描述>", category="quick|deep")
 ## 📋 每日工作流
 
 ```
-早上 9:00  → /zcf:status brief      (查看今日计划)
-开始编码前 → /zcf:sync-to-encoding --list (确认文档最新)
-任务完成后 → /zcf:task-review "Task XXX 完成" (自动评审)
-晚上       → 检查 memory/YYYY-MM-DD.md (记录日志)
+早上 9:00     → skill_use acf-status mode=brief  (查看状态)
+新任务接收    → 决策树检查 → Interview/架构循环  (强制)
+开始编码前    → 读取 .acf/status/current-task.md (确认进展)
+任务执行前    → 更新 current-task.md → acf-executor
+任务完成后    → /zcf/task-review → acf-flow → 更新 current-task.md
+晚上          → 更新 memory/YYYY-MM-DD.md + .acf/ (双层记忆)
+Gateway 重启  → 读取双层记忆 → 恢复报告 → 继续
 ```
 
 ---
